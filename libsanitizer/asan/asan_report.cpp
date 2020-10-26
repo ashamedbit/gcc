@@ -25,6 +25,7 @@
 #include "sanitizer_common/sanitizer_report_decorator.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
 #include "sanitizer_common/sanitizer_symbolizer.h"
+#include "sanitizer_common/sanitizer_watchaddr.h"
 
 namespace __asan {
 
@@ -411,7 +412,7 @@ static bool IsInvalidPointerPair(uptr a1, uptr a2) {
   return false;
 }
 
-static inline void CheckForInvalidPointerPair(void *p1, void *p2) {
+static INLINE void CheckForInvalidPointerPair(void *p1, void *p2) {
   switch (flags()->detect_invalid_pointer_pairs) {
     case 0:
       return;
@@ -456,8 +457,48 @@ static bool SuppressErrorReport(uptr pc) {
   Die();
 }
 
+bool CheckWatch(uptr addr,uptr access_size,uptr pc,uptr bp){
+    if (AddrIsInMem(addr)) {
+
+      // Do checks to verify that this chunk of memory for load/store contains to be watched mem
+      u8 *shadow_addr = (u8 *)MemToShadow(addr);
+      if ((*shadow_addr & 0xe0) != 0xe0)
+      {
+         // If we are accessing 16 bytes, look at the second shadow byte.
+         if (access_size > SHADOW_GRANULARITY)
+         {
+             shadow_addr++;
+             if ((*shadow_addr & 0xe0) != 0xe0)
+                return false;
+         }
+         else
+             return false;
+      }
+
+      AsanChunkView chunk = FindHeapChunkByAddress(addr);
+      if (!chunk.IsValid()) {
+        return false;
+      }
+      u32 alloc_stack_id = chunk.GetAllocStackId();
+ 
+      GET_STACK_TRACE_FATAL(pc,bp);
+      StackDepotPutLastUse(alloc_stack_id,&stack) ;     
+      Printf("CheckWatch alloc_stack_id %zu :\n",alloc_stack_id);
+
+      // This needs to become true
+      return false;
+     } 
+    return false;
+}
+
 void ReportGenericError(uptr pc, uptr bp, uptr sp, uptr addr, bool is_write,
                         uptr access_size, u32 exp, bool fatal) {
+
+  if (!CheckWatch(addr, access_size, pc, bp))
+  {
+      return;
+  }
+ 
   if (!fatal && SuppressErrorReport(pc)) return;
   ENABLE_FRAME_POINTER;
 

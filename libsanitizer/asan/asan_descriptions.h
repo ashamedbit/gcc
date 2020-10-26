@@ -75,6 +75,23 @@ class Decorator : public __sanitizer::SanitizerCommonDecorator {
         return Yellow();
       case kAsanIntraObjectRedzone:
         return Yellow();
+      case kAsanWatchMagic:
+        return Green();
+      case kAsanWatchMagic+1:
+        return Green();
+      case kAsanWatchMagic+2:
+        return Green();
+      case kAsanWatchMagic+3:
+        return Green();
+      case kAsanWatchMagic+4:
+        return Green();
+      case kAsanWatchMagic+5:
+        return Green();
+      case kAsanWatchMagic+6:
+        return Green();
+      case kAsanWatchMagic+7:
+        return Green();
+
       default:
         return Default();
     }

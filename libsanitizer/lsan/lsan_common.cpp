@@ -24,6 +24,9 @@
 #include "sanitizer_common/sanitizer_suppressions.h"
 #include "sanitizer_common/sanitizer_thread_registry.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
+#include "sanitizer_common/sanitizer_watchaddr.h"
+#include "sanitizer_common/sanitizer_watchaddrfileio.h"
+
 
 #if CAN_SANITIZE_LEAKS
 namespace __lsan {
@@ -33,7 +36,6 @@ namespace __lsan {
 BlockingMutex global_mutex(LINKER_INITIALIZED);
 
 Flags lsan_flags;
-
 
 void DisableCounterUnderflow() {
   if (common_flags()->detect_leaks) {
@@ -106,6 +108,10 @@ void InitializeRootRegions() {
   CHECK(!root_regions);
   ALIGNED(64) static char placeholder[sizeof(InternalMmapVector<RootRegion>)];
   root_regions = new (placeholder) InternalMmapVector<RootRegion>();
+}
+
+const char *MaybeCallLsanDefaultOptions() {
+  return (&__lsan_default_options) ? __lsan_default_options() : "";
 }
 
 void InitCommonLsan() {
@@ -218,7 +224,10 @@ static void ProcessThreads(SuspendedThreadsList const &, Frontier *) {}
 // Scans thread data (stacks and TLS) for heap pointers.
 static void ProcessThreads(SuspendedThreadsList const &suspended_threads,
                            Frontier *frontier) {
-  InternalMmapVector<uptr> registers;
+  InternalMmapVector<uptr> registers(suspended_threads.RegisterCount());
+  uptr registers_begin = reinterpret_cast<uptr>(registers.data());
+  uptr registers_end =
+      reinterpret_cast<uptr>(registers.data() + registers.size());
   for (uptr i = 0; i < suspended_threads.ThreadCount(); i++) {
     tid_t os_id = static_cast<tid_t>(suspended_threads.GetThreadID(i));
     LOG_THREADS("Processing thread %d.\n", os_id);
@@ -235,7 +244,7 @@ static void ProcessThreads(SuspendedThreadsList const &suspended_threads,
     }
     uptr sp;
     PtraceRegistersStatus have_registers =
-        suspended_threads.GetRegistersAndSP(i, &registers, &sp);
+        suspended_threads.GetRegistersAndSP(i, registers.data(), &sp);
     if (have_registers != REGISTERS_AVAILABLE) {
       Report("Unable to get registers from thread %d.\n", os_id);
       // If unable to get SP, consider the entire stack to be reachable unless
@@ -244,13 +253,9 @@ static void ProcessThreads(SuspendedThreadsList const &suspended_threads,
       sp = stack_begin;
     }
 
-    if (flags()->use_registers && have_registers) {
-      uptr registers_begin = reinterpret_cast<uptr>(registers.data());
-      uptr registers_end =
-          reinterpret_cast<uptr>(registers.data() + registers.size());
+    if (flags()->use_registers && have_registers)
       ScanRangeForPointers(registers_begin, registers_end, frontier,
                            "REGISTERS", kReachable);
-    }
 
     if (flags()->use_stacks) {
       LOG_THREADS("Stack at %p-%p (SP = %p).\n", stack_begin, stack_end, sp);
@@ -499,6 +504,7 @@ static void CollectLeaksCb(uptr chunk, void *arg) {
   if (m.tag() == kDirectlyLeaked || m.tag() == kIndirectlyLeaked) {
     u32 resolution = flags()->resolution;
     u32 stack_trace_id = 0;
+
     if (resolution > 0) {
       StackTrace stack = StackDepotGet(m.stack_trace_id());
       stack.size = Min(stack.size, resolution);
@@ -737,7 +743,50 @@ void LeakReport::PrintReportForLeak(uptr index) {
          leaks_[index].total_size, leaks_[index].hit_count);
   Printf("%s", d.Default());
 
-  PrintStackTraceById(leaks_[index].stack_trace_id);
+  StackTrace s = StackDepotGet(leaks_[index].stack_trace_id);
+  
+  s.Print();
+  WriteWatchAddr(&s);
+  //PrintStackTraceById(leaks_[index].stack_trace_id);
+
+  BufferedStackTrace bs;
+  bs.size=s.size;
+
+  for(int i=1;i<s.size-1;i++)
+      bs.trace_buffer[i]=s.trace[i];
+
+  BufferedStackTrace* lastusethisrun = StackDepotGetLastUse(leaks_[index].stack_trace_id);
+  BufferedStackTrace* prevlastuse = GetPrevRunLastUse(&bs);
+
+  if (lastusethisrun)
+  {
+      Printf("Lastuse this run:\n");
+      lastusethisrun->Print();
+  }
+
+  if (prevlastuse)
+  {
+      Printf("prev Lastuse:\n");
+      prevlastuse->Print();
+  }
+
+  BufferedStackTrace* lastuse = MergeLastUse(lastusethisrun,prevlastuse);
+
+  if (lastuse)
+  {
+      Printf("Last use of above stack with alloc_stack_id %zu :\n",leaks_[index].stack_trace_id);
+      (lastuse)->Print();
+      WriteWatchAddr(lastuse);
+      //Printf("Storing this shit:  %zu :\n",lastuse->trace_buffer[1]);
+
+  }
+  else
+  {
+      // malloc stack is last use itself for this run
+      WriteWatchAddr(nullptr);
+  }
+  //Printf("Storing this shit:  %zu :\n",s.trace[1]);
+  Printf("\n");
 
   if (flags()->report_objects) {
     Printf("Objects leaked above:\n");
@@ -890,11 +939,12 @@ int __lsan_do_recoverable_leak_check() {
   return 0;
 }
 
-SANITIZER_INTERFACE_WEAK_DEF(const char *, __lsan_default_options, void) {
+#if !SANITIZER_SUPPORTS_WEAK_HOOKS
+SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
+const char * __lsan_default_options() {
   return "";
 }
 
-#if !SANITIZER_SUPPORTS_WEAK_HOOKS
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
 int __lsan_is_turned_off() {
   return 0;

@@ -151,6 +151,7 @@ am__objects_1 = sancov_flags.lo sanitizer_allocator.lo \
 	sanitizer_symbolizer_win.lo sanitizer_termination.lo \
 	sanitizer_thread_registry.lo sanitizer_tls_get_addr.lo \
 	sanitizer_unwind_linux_libcdep.lo sanitizer_unwind_win.lo \
+	sanitizer_watchaddr.lo sanitizer_watchaddrfileio.lo \
 	sanitizer_win.lo
 am_libsanitizer_common_la_OBJECTS = $(am__objects_1)
 libsanitizer_common_la_OBJECTS = $(am_libsanitizer_common_la_OBJECTS)
@@ -437,6 +438,8 @@ sanitizer_common_files = \
 	sanitizer_tls_get_addr.cpp \
 	sanitizer_unwind_linux_libcdep.cpp \
 	sanitizer_unwind_win.cpp \
+	sanitizer_watchaddr.cpp \
+	sanitizer_watchaddrfileio.cpp \
 	sanitizer_win.cpp
 
 libsanitizer_common_la_SOURCES = $(sanitizer_common_files) 
@@ -594,6 +597,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_tls_get_addr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_unwind_linux_libcdep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_unwind_win.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_watchaddr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_watchaddrfileio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_win.Plo@am__quote@
 
 .cpp.o:
