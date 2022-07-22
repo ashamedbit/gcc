@@ -1,18 +1,3 @@
-Memory leak bugs are a major problem in C/C++ programs, which occur when memory objects are not deallocated.
-Developers need to manually deallocate these objects to prevent memory leaks. As such, several techniques have been proposed to
-automatically fix memory leaks. Although proposed approaches have merit in automatically fixing memory leaks, they present
-limitations. Static-based approaches have challenges when the target program has a large number of paths (path explosion). On the
-other hand, dynamic approaches have been proposed to mitigate such a problem by performing dynamic binary instrumentation,
-however, such solutions come at the cost of performance degradation due to the heavy-weight instrumentation.
+Memory leak bugs are a major problem in C/C++ programs, which occur when memory objects are not deallocated. Developers need to manually deallocate these objects to prevent memory leaks. As such, several techniques have been proposed to automatically fix memory leaks. Although proposed approaches have merit in automatically fixing memory leaks, they present limitations. Static-based approaches have challenges when the target program has a large number of paths (path explosion). On the other hand, dynamic approaches have been proposed to mitigate such a problem by performing dynamic binary instrumentation, however, such solutions come at the cost of performance degradation due to the heavy-weight instrumentation.
 
-In this regards, we design and implement a novel framework named AddressWatcher. AddressWatcher employs the existing
-infrastructure of well-known sanitizer-based tools (i.e., ASAN and LSAN) to perform a light-weight compile instrumentation in the
-program. Then, AddressWatcher utilizes the instrumentation during the program execution to watch and track memory leaks address.
-For each leak, AddressWatcher tracks possible execution paths that a leaked object passes through, and collects all stack traces
-where the leaked object is used. Finally, a stack that involves the deepest point in the program flow is suggested as a potential fix
-location for the leak. We conduct an evaluation of AddressWatcher over three popular packages, namely binutils, openssh, and tmux.
-In 10 out of 26 real-world memory leak bugs, AddressWatcher correctly points a free location to fix memory leaks. We compare our
-framework with Memfix, the state-of-the-art static approach for fixing memory leaks, and find that Memfix fixes 12 bugs out of the
-examined 26 bugs. Despite the lower number of fixes by AddressWatcher, as compared to Memfix, our manual analysis demonstrates
-that AddressWatcher is able to fix 5 memory leaks that Memfix is not able to fix due to timeout issues. We develop a tool prototype for
-our framework (i.e., AddressWatcher).
+In this regards, we design and implement a novel framework named AddressWatcher. AddressWatcher employs the existing infrastructure of well-known sanitizer-based tools (i.e., ASAN and LSAN) to perform a light-weight compile instrumentation in the program. Then, AddressWatcher utilizes the instrumentation during the program execution to watch and track memory leaks address. For each leak, AddressWatcher tracks possible execution paths that a leaked object passes through, and collects all stack traces where the leaked object is used. Finally, a stack that involves the deepest point in the program flow is suggested as a potential fix location for the leak. We conduct an evaluation of AddressWatcher over three popular packages, namely binutils, openssh, and tmux. In 10 out of 26 real-world memory leak bugs, AddressWatcher correctly points a free location to fix memory leaks. We compare our framework with Memfix, the state-of-the-art static approach for fixing memory leaks, and find that Memfix fixes 12 bugs out of the examined 26 bugs. Despite the lower number of fixes by AddressWatcher, as compared to Memfix, our manual analysis demonstrates that AddressWatcher is able to fix 5 memory leaks that Memfix is not able to fix due to timeout issues. We develop a tool prototype for our framework (i.e., AddressWatcher).
